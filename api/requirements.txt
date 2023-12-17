@@ -1,0 +1,7 @@
+psycopg2-binary
+fastapi
+uvicorn
+pandas
+nba_api
+httpx
+sqlalchemy
