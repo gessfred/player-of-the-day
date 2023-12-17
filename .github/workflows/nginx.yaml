@@ -13,9 +13,9 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - run: echo ${{ secrets.REGISTRY_TOKEN }} | docker login ghcr.io -u USERNAME --password-stdin
-    - run: docker build . --file ./Dockerfile --build-arg REACT_APP_VERSION=$GITHUB_SHA --tag "ghcr.io/gessfred/nginx/<app>:$GITHUB_SHA"
+    - run: docker build . --file ./web/Dockerfile --build-arg REACT_APP_VERSION=$GITHUB_SHA --tag "ghcr.io/gessfred/nginx/<app>:$GITHUB_SHA"
     - run: docker push "ghcr.io/gessfred/nginx/<app>:$GITHUB_SHA"
-    - run: docker build . --file ./Dockerfile --build-arg REACT_APP_VERSION=$GITHUB_SHA --tag "ghcr.io/gessfred/nginx/<app>:latest"
+    - run: docker build . --file ./web/Dockerfile --build-arg REACT_APP_VERSION=$GITHUB_SHA --tag "ghcr.io/gessfred/nginx/<app>:latest"
     - run: docker push "ghcr.io/gessfred/nginx/<app>:latest"
   
   deploy:
