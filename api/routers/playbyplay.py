@@ -10,6 +10,7 @@ import pandas as pd
 from nba_api.stats.endpoints import Scoreboard, BoxScoreTraditionalV2
 from dependencies import get_db
 import json
+import psycopg2
 
 router = APIRouter()
 
@@ -37,27 +38,31 @@ def get_player_timeline(player: str, game_id: str, db = Depends(get_db)):
     game_id = "0022300002"
     pbp = playbyplayv2.PlayByPlayV2(game_id)
     play_by_play = pbp.get_data_frames()[0]
-    play_by_play.to_sql(name="play_by_play", con=db.bind, if_exists="append")
+    play_by_play.to_sql(name="play_by_play", con=db.bind, if_exists="append", index=False)
+    search_term = "SUB:%G. Antetokounmpo%"
+    sub_search = "% FOR G. Antetokounmpo%"
     # compute player-timeline and return
-    query = ("""
+    query = pd.read_sql("""
     with neutral_play_by_play as (
         select 
-            eventnum as event_num,
+            "EVENTNUM" as event_num,
             coalesce(
-                homedescription,
-                neutraldescription,
-                visitordescription
+                "HOMEDESCRIPTION",
+                "NEUTRALDESCRIPTION",
+                "VISITORDESCRIPTION"
             ) as play_description,
-            period as quarter_num,
-            pctimestring as shot_clock,
-            wctimestring as real_time,
-            score
+            "PERIOD" as quarter_num,
+            "PCTIMESTRING" as shot_clock,
+            "WCTIMESTRING" as real_time,
+            "SCORE" as score
         from play_by_play
     ),
     player_sub_times as (
-        select *, play_description like '% FOR G. Antetokounmpo%' as is_leaving
+        select 
+            *,
+            play_description like %(flow_search)s as is_leaving
         from neutral_play_by_play
-        where play_description ilike 'SUB:%G. Antetokounmpo%'
+        where play_description ilike %(player_search)s
     ),
     sub_with_score as (
         select 
@@ -74,14 +79,15 @@ def get_player_timeline(player: str, game_id: str, db = Depends(get_db)):
             and pbp.score is not null
     ),
     score_by_sub as (
-        select * from sub_with_score
-        qualify row_number() over (
-            partition by sub_event_id
-            order by score_event_id desc
-        ) = 1
-        order by sub_event_id asc
+        select 
+            *,
+            row_number() over (
+                partition by sub_event_id
+                order by score_event_id desc
+            ) = 1 as is_sub
+        from sub_with_score
     )
-    select * from score_by_sub
-    """)
-    res = pd.read_sql("select * from play_by_play limit 7", db.bind)
-    return  json.loads(res.to_json(orient="records"))
+    select * from score_by_sub where is_sub
+    """, con=db.bind, params={"player_search": search_term, "flow_search": sub_search})
+    #res = pd.read_sql("select * from play_by_play limit 7", db.bind)
+    return  json.loads(query.to_json(orient="records"))
