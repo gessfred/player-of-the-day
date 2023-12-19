@@ -5,11 +5,8 @@ on:
     branches: [ ]
 
 jobs:
-
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v3
     - run: echo ${{ secrets.REGISTRY_TOKEN }} | docker login ghcr.io -u USERNAME --password-stdin
