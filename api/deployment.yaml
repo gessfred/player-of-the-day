@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: player-of-the-day-api
+spec:
+  selector:
+    matchLabels:
+      app: player-of-the-day-api
+  template:
+    metadata:
+      labels:
+        app: player-of-the-day-api
+    spec:
+      imagePullSecrets:
+      - name: github-regcred
+      serviceAccountName: app-manager
+      containers:
+      - name: player-of-the-day-api
+        image: ghcr.io/gessfred/player-of-the-day-api:latest
+        command: [ "uvicorn" ]
+        args: [ "main:app", "--host", "0.0.0.0", "--port", "8080" ]
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DB_NAME
+          value: "nba"
+        - name: DB_PORT
+          value: "25060"
+        - name: DB_USER
+          value: "doadmin"
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgre-password
+              key: db_password
+---
+apiVersion: v1
+kind: Service 
+metadata:
+  name: player-of-the-day-api-svc
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: player-of-the-day-api
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: player-of-the-day-nginx
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - nba.gessfred.xyz
+    secretName: player-of-the-day-tls-cert-secret
+  rules:
+  - host: nba.gessfred.xyz
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/api"
+        backend:
+          service:
+            name: player-of-the-day-api-svc
+            port:
+              number: 8080
